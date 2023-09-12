@@ -1,0 +1,19 @@
+[
+    {
+        "host": "localhost",
+        "user": "seu_usuario",
+        "password": "sua_senha",
+        "database": "nome_do_banco_de_dados",
+        "active": true
+    },
+    {
+        "host": "localhost",
+        "user": "seu_usuario",
+        "password": "sua_senha",
+        "databases": [
+            "database_1",
+            "database_2"
+        ],
+        "active": false
+    }
+]
