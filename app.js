@@ -2,6 +2,7 @@ require('dotenv').config();
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const fsExtra = require('fs-extra');
 
 const dir = path.join(process.env.DIR_BACKUPS, datetime());
 createDir(dir);
@@ -105,7 +106,7 @@ async function backupDatabase(db) {
     console.log(`Banco de Dados: ${db.database}`)
 
     return new Promise((resolve, reject) => {
-        const command = `mysqldump -h ${db.host} -u ${db.user} -p${db.password} --skip-column-statistics ${db.database} > "${dir_bkp}\\${db.database}.sql"`;
+        const command = `mysqldump --force -h ${db.host} -u ${db.user} -p${db.password} --skip-column-statistics ${db.database} --single-transaction > "${dir_bkp}\\${db.database}.sql"`;
 
         exec(command, (error, stdout, stderr) => {
             if (error) {
@@ -119,9 +120,59 @@ async function backupDatabase(db) {
 }
 
 
+function removeOldBackups() {
+    const regex = /^\d{4}-\d{2}-\d{2} \d{6}$/;
+
+    fs.readdir(process.env.DIR_BACKUPS, (err, files) => {
+        console.log('');
+
+        let qt = process.env.QT_BACKUP ?? 0;
+        qt = +qt;
+        if (qt <= 0) {
+            console.log('Não remover backups antigos');
+            return;
+        }
+
+        console.log(qt)
+        let pls = (qt > 1 && "s" || '')
+        console.log(`Manter somente o${pls} último${pls} ${qt} backup${pls}`);
+
+
+        // Crie um array de objetos com informações de diretório e data de modificação
+        const directories = files.map(file => {
+            const dirPath = path.join(process.env.DIR_BACKUPS, file);
+            const stats = fs.statSync(dirPath);
+            return { path: dirPath, mtime: stats.mtime };
+        }).filter(item => {
+            return (regex.test(path.basename(item.path)));
+        });
+
+        // Ordene os diretórios pela data de modificação em ordem decrescente (mais recente primeiro)
+        directories.sort((a, b) => b.mtime - a.mtime);
+
+        // Mantenha apenas os 5 diretórios mais recentes
+        const keep = directories.slice(0, process.env.QT_BACKUP);
+        console.log(keep)
+
+        // Remova os diretórios que não estão na lista de diretórios para manter
+        directories.forEach(dir => {
+            if (!keep.includes(dir)) {
+                fsExtra.remove(dir.path, err => {
+                    if (err) {
+                        console.log(`❌ Erro ao remover diretório ${dir.path}:`, err);
+                    } else {
+                        console.log(`✔️ Diretório removido: ${dir.path}`);
+                    }
+                });
+            }
+        });
+    });
+}
+
 
 backup()
     .then(() => {
+        removeOldBackups();
         console.log('')
         console.log('🟢 Rotina processada com sucesso.');
     })
